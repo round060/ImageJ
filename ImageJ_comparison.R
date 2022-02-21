@@ -4,6 +4,7 @@ library(dplyr)
 library(stringr)
 library(SimilarityMeasures)
 library(mosaic)
+se <- function(x) sqrt(var(x)/length(x))
 
 DEM_hypsos <- readRDS("data/MN_bathy.rds")
 DEM_hypsos$DOW <- fixlakeid(DEM_hypsos$DOW)
@@ -303,7 +304,6 @@ for (row in 1:nrow(Hypsos_depth)) {
 maxdepth[i,1] = dow; maxdepth[i,2] = max_depth
 
 # statistics for all lake depths
-se <- function(x) sqrt(var(x)/length(x))
 mean(maxdepth$max_depth)  #31.8
 confint(maxdepth$max_depth)
 se(maxdepth$max_depth)    #1.13
