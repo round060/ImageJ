@@ -10,7 +10,7 @@ DEM_hypsos <- readRDS("data/MN_bathy.rds")
 DEM_hypsos$DOW <- fixlakeid(DEM_hypsos$DOW)
 
 # Hypsos Chris did
-Perc_CR <- "data/Fourth_set" #file name with the files to be checked for QC
+Perc_CR <- "data/Fourth_set_CR" #file name with the files to be checked for QC
 Perc_files_CR <- list.files(Perc_CR, pattern = "csv", full.names = T)
 # Make sure these are QC'ed first!
 # Get DOW  
