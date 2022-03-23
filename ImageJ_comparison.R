@@ -85,6 +85,13 @@ Hypsos_depth <- All_Hypsos
 Hypsos_depth$proportion_depth = NA
 maxdepth_lake <- data.frame("DOW" = character(1), "max_depth" = numeric(1), 
                             "method" = character(1), stringsAsFactors = FALSE)
+# Now we have The DEM hypsography and the hypsography from two different digitizers using ImageJ.
+# Now I am going to extract the max depth of the DEM for each lake.
+# With this max depth we can calculate a "null" or uninformed hypsography for each lake, 
+# Such as lake area linearly decreases with increasing depth
+# The package General Lake Model (GLM) does this with the generate_hypsography function.
+
+
 
 #get the maximum depth for each lake using each method
 max_depth = Hypsos_depth[1,3]; DOW = Hypsos_depth[1,2] 
@@ -107,7 +114,7 @@ maxdepth_lake[i,1] = DOW; maxdepth_lake[i,2] = max_depth; maxdepth_lake[i,3] = m
 #write.csv(maxdepth_lake, "data/max_depth_validation.csv", row.names = F)
 
 
-### calulate what hypsography would be with only max-depth ###
+### calculate what hypsography would be with only max-depth ###
 #Use package General Lake Model#
 all_hypsos <- subset(All_Hypsos, select = -c(depths))
 #sets up the null models
@@ -180,7 +187,7 @@ for (j in 1:length(methods)) {
   Distances <- rbind(Distances, Distances_temp)
   
 } #second for loop
-Distances <- na.omit(Distances)
+Distances <- na.omit(Distances) 
 
 
 ## Difference between hypsos Amanda and Chris did
@@ -214,10 +221,12 @@ Distances_AVP_CR <- data.frame(DOW = Perc_DOWs_AVP, Mean_Absolute_Diff = avg.abs
 Distances_AVP_CR <- arrange(Distances_AVP_CR, DOW)
 
 
-mosaic::mean(Mean_Absolute_Diff~Method, data = Distances)
+mosaic::mean(Mean_Absolute_Diff~Method, data = Distances) 
+#Amanda = 0.046, Chris = 0.051, Null >= 0.15
 mean(Distances_AVP_CR$Mean_Absolute_Diff) #0.0157
 
 mosaic::median(Mean_Absolute_Diff~Method, data = Distances)
+#Amanda = 0.027, Chris = 0.032, Null >= 0.15
 median(Distances_AVP_CR$Mean_Absolute_Diff) # 0.0078
 
 mosaic::sd(Mean_Absolute_Diff~Method, data = Distances)
@@ -237,6 +246,8 @@ t.test(Distances_AVP_CR$Mean_Absolute_Diff, conf.level = 0.95)
 sum(Distances_CR$Mean_Absolute_Diff > 0.10)/100 # 14% (14) greater than 10% difference on average
 sum(Distances_CR$Mean_Absolute_Diff > 0.15)/100 # 9% (9) greater than 15% difference on average
 
+sum(Distances_AVP$Mean_Absolute_Diff > 0.10)/100 # 13% (13) greater than 10% difference on average
+sum(Distances_AVP$Mean_Absolute_Diff > 0.15)/100 # 6% (6) greater than 15% difference on average
 
 
 ### ggplots ###
@@ -255,10 +266,30 @@ plot_df %>% ggplot(aes(Mean_DEM_Diff, colour = Method)) +
 
 
 
+lake_areas$DOW <- fixlakeid(lake_areas$DOW)
+area_diff = merge(Distances, lake_areas)
+max_depth = max_depth[,-3]
+area_diff = merge(area_diff, max_depth, by = 'DOW')
+
+#change legend attributes
+area_diff %>% ggplot(aes(x = max_depth, y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(y = "MAD", x = "Max depth (ft)") 
+  #ggtitle("MAD vs lake depth separated by method")
+
+area_diff %>% ggplot(aes(x = log(Area_acres), y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(y = "MAD", x = "Log Lake Area (Acres)")
+  #ggtitle("MAD vs lake size separated by method")
+
+
 # good matches
 good_matches <- Distances_CR[ which(Distances_CR$Mean_Absolute_Diff <= 0.0152), ] 
 #arbitrary cutoff, chosen because it selects 16 lakes
 good_match_data <- subset(All_Hypsos, DOW %in% good_matches$DOW)
+
 
 windows()
 ggplot(good_match_data, aes(x = proportion_area, y = -1 * depth_feet, group = Method)) + 
@@ -284,24 +315,7 @@ ggplot(example_match_data, aes(x = proportion_area, y = -1 * depth_feet, group =
   theme(plot.title = element_text(hjust = 0.5)) +
   ggtitle("Hypsographic Curves With Low Agreement")
 
-lake_areas$DOW <- fixlakeid(lake_areas$DOW)
-area_diff = merge(Distances, lake_areas)
-max_depth = max_depth[,-3]
-area_diff = merge(area_diff, max_depth, by = 'DOW')
 
-
-#change legend attributes
-area_diff %>% ggplot(aes(x = max_depth, y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
-  geom_point() +
-  geom_smooth(method = "lm") + 
-  labs(y = "MAD", x = "Max depth (ft)") +
-  ggtitle("MAD vs lake depth seperated by method")
-
-area_diff %>% ggplot(aes(x = log(Area_acres), y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
-  geom_point() +
-  geom_smooth(method = "lm") + 
-  labs(y = "MAD", x = "Log Lake Area (Acres)") +
-  ggtitle("MAD vs lake size seperated by method")
 
 
 

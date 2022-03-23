@@ -2,8 +2,8 @@ library(stringr)
 library(dplyr)
 
 # expects hypsography to be in proportions of lake area
-
-dir_name <- "directory name where hypsography is stored"
+setwd("./data")
+dir_name <- "Fourth_set_AVP"
 Hypsos <- list.files(dir_name, pattern = "csv", full.names = T, recursive = F)
 
 QCreport <- data.frame(File = NA, Flag = NA)
