@@ -10,6 +10,7 @@ library(SimilarityMeasures)
 library(mosaic)
 
 se <- function(x) sqrt(var(x)/length(x))
+
 lake_areas <- read.csv("data/MN_areas.csv")
 
 DEM_hypsos <- readRDS("data/MN_bathy.rds")
@@ -187,7 +188,7 @@ for (j in 1:length(methods)) {
   Distances <- rbind(Distances, Distances_temp)
   
 } #second for loop
-Distances <- na.omit(Distances) 
+Distances <- na.omit(Distances) #this removes the first row that was set to NA when creating the df
 
 
 ## Difference between hypsos Amanda and Chris did
@@ -221,6 +222,20 @@ Distances_AVP_CR <- data.frame(DOW = Perc_DOWs_AVP, Mean_Absolute_Diff = avg.abs
 Distances_AVP_CR <- arrange(Distances_AVP_CR, DOW)
 
 
+### summaries of both digitizers together
+both_digitizers <- Distances %>%
+  dplyr::filter(Method == "ImageJ_CR" | Method == "ImageJ_AVP")
+
+mean(both_digitizers$Mean_Absolute_Diff)
+t.test(both_digitizers$Mean_Absolute_Diff,   conf.level = 0.95)
+mean(both_digitizers$Mean_DEM_Diff)
+t.test(both_digitizers$Mean_DEM_Diff,   conf.level = 0.95)
+
+sum(both_digitizers$Mean_Absolute_Diff > 0.10) # 13.5% (27) greater than 10% difference on average
+sum(both_digitizers$Mean_Absolute_Diff > 0.15) # 7.5% (15) greater than 15% difference on average
+
+
+### individual summaries
 mosaic::mean(Mean_Absolute_Diff~Method, data = Distances) 
 #Amanda = 0.046, Chris = 0.051, Null >= 0.15
 mean(Distances_AVP_CR$Mean_Absolute_Diff) #0.0157
@@ -252,45 +267,57 @@ sum(Distances_AVP$Mean_Absolute_Diff > 0.15)/100 # 6% (6) greater than 15% diffe
 
 ### ggplots ###
 
-# histogram MAD and MSD
+### histogram MAD and MSD
 plot_df <- Distances %>%
-  dplyr::filter(Method == "ImageJ_AVP" | Method == "ImageJ_CR")
+  dplyr::filter(Method == "ImageJ_AVP" | Method == "ImageJ_CR") %>%
+  mutate(Method = ifelse(Method == "ImageJ_AVP", "Processor 1", "Processor 2"))
  
-#change legend attributes
-plot_df %>% ggplot(aes(Mean_Absolute_Diff, colour = Method)) +
+A <- data.frame(
+  x = c(.2),
+  y = c(20),
+  label = c("A"))
+
+B <- data.frame(
+  x = c(.18),
+  y = c(25),
+  label = c("B"))
+
+MAD <- plot_df %>% ggplot(aes(Mean_Absolute_Diff, colour = Method)) +
   geom_freqpoly() +
-  labs(y = "Frequency", x = "Mean Absolute Difference", colour = "Method")
-plot_df %>% ggplot(aes(Mean_DEM_Diff, colour = Method)) +
+  labs(y = "Frequency", x = "Mean Absolute Difference", colour = "Method") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_text(data = A, aes(x = x, y = y, label = label), 
+              color = "black", 
+              size = 7, fontface = "bold")
+
+MSD <- plot_df %>% ggplot(aes(Mean_DEM_Diff, colour = Method)) +
   geom_freqpoly() +
-  labs(y = "Frequency", x = "Mean Signed Difference", colour = "Method")
+  labs(y = "Frequency", x = "Mean Signed Difference", colour = "Method") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_text(data = B, aes(x = x, y = y, label = label), 
+            color = "black", 
+            size = 7, fontface = "bold")
+
+fig.3 <- gridExtra::arrangeGrob(MAD, MSD, ncol = 1)
+#ggsave(file = "Fig.3.png", plot = fig.3, path = "Figures/", width = 4, height = 4, dpi = 250)
 
 
-
-lake_areas$DOW <- fixlakeid(lake_areas$DOW)
-area_diff = merge(Distances, lake_areas)
-max_depth = max_depth[,-3]
-area_diff = merge(area_diff, max_depth, by = 'DOW')
-
-#change legend attributes
-area_diff %>% ggplot(aes(x = max_depth, y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
-  geom_point() +
-  geom_smooth(method = "lm") + 
-  labs(y = "MAD", x = "Max depth (ft)") 
-  #ggtitle("MAD vs lake depth separated by method")
-
-area_diff %>% ggplot(aes(x = log(Area_acres), y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
-  geom_point() +
-  geom_smooth(method = "lm") + 
-  labs(y = "MAD", x = "Log Lake Area (Acres)")
-  #ggtitle("MAD vs lake size separated by method")
-
-
-# good matches
+### Good matches
 good_matches <- Distances_CR[ which(Distances_CR$Mean_Absolute_Diff <= 0.0152), ] 
 #arbitrary cutoff, chosen because it selects 16 lakes
 good_match_data <- subset(All_Hypsos, DOW %in% good_matches$DOW)
 
-
+good_match_data <- good_match_data %>%
+  mutate(Method = case_when(
+    Method == "DEM" ~ "DEM",
+    Method == "ImageJ_AVP" ~ "Processor 1",
+    TRUE ~ "Processor 2"),
+  Method = forcats::fct_relevel(Method, "Processor 1", "Processor 2"))
+  
 windows()
 ggplot(good_match_data, aes(x = proportion_area, y = -1 * depth_feet, group = Method)) + 
   #750 by 600 pixels works best
@@ -298,87 +325,54 @@ ggplot(good_match_data, aes(x = proportion_area, y = -1 * depth_feet, group = Me
   geom_point(aes(shape = Method, col = Method)) + 
   facet_wrap(~DOW, scales = 'free') +
   labs(y = "Depth (feet)", x = "Proportion Area") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  ggtitle("Hypsographic Curves With High Agreement")
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
-# poor matches
-example_match_data <- subset(All_Hypsos, DOW %in% c(71004600, 69004400, 38053900))
-unique(example_match_data$DOW)
+#ggsave(file = "Fig.2.png", path = "Figures/", width = 8, height = 5.75, dpi = 400)
+
+
+### Poor matches
+poor_match_data <- subset(All_Hypsos, DOW %in% c(71004600, 69004400, 38053900))
+unique(poor_match_data$DOW)
+
+poor_match_data <- poor_match_data %>%
+  mutate(Method = case_when(
+    Method == "DEM" ~ "DEM",
+    Method == "ImageJ_AVP" ~ "Processor 1",
+    TRUE ~ "Processor 2"),
+    Method = forcats::fct_relevel(Method, "Processor 1", "Processor 2"))
 
 windows()
-ggplot(example_match_data, aes(x = proportion_area, y = -1 * depth_feet, group = Method)) + 
+ggplot(poor_match_data, aes(x = proportion_area, y = -1 * depth_feet, group = Method)) + 
   #750 by 600 pixels works best
   geom_line(aes(linetype = Method, col = Method)) +
   geom_point(aes(shape = Method, col = Method)) + 
   facet_wrap(~DOW, scales = 'free') +
   labs(y = "Depth (feet)", x = "Proportion Area") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  ggtitle("Hypsographic Curves With Low Agreement")
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+#ggsave(file = "Fig.4.png", path = "Figures/", width = 8, height = 5.75, dpi = 400)
 
 
+### JASM presentation stuff
+lake_areas$DOW <- fixlakeid(lake_areas$DOW)
+area_diff = merge(Distances, lake_areas)
+max_depth = max_depth[,-3]
+area_diff = merge(area_diff, max_depth, by = 'DOW')
 
 
+area_diff %>% ggplot(aes(x = max_depth, y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(y = "MAD", x = "Max depth (ft)") 
+#ggtitle("MAD vs lake depth separated by method")
+#ggsave(file = "MAD_vs_depth.png", path = "Figures/", width = 4, height = 4, dpi = 250)
 
-### Calculate depth information for all MN and WI lakes (not just validation) #####
-
-ALL_MN <- "data/First_set" 
-allMN_files <- list.files(ALL_MN, pattern = "csv", full.names = T)
-
-ALL_WI <- "data/WI_set"
-allWI_files <- list.files(ALL_WI, patter = "csv", full.names = T)
-
-# Get DOW  
-PercMN_DOWs <- basename(allMN_files) %>% str_extract(., '[0-9]+.csv$') %>% str_extract('[0-9]+')
-PercMN_DOWs <- fixlakeid(PercMN_DOWs) # 2 missing leading zeroes
-unique(PercMN_DOWs)
-
-# Get WBIC
-PercWI_DOWs <- basename(allWI_files) %>% str_extract(., '[0-9]+.csv$') %>% str_extract('[0-9]+')
-
-MN_Hypsos <- NA
-for (i in seq_along(PercMN_DOWs)) {
-  dat <- read.csv(allMN_files[i])[,1:2] %>% setNames(c('depth_feet', 'proportion_area'))
-  dat$DOW <- PercMN_DOWs[i]
-  MN_Hypsos <- rbind(MN_Hypsos, dat)
-}
-MN_Hypsos <- MN_Hypsos %>% filter(!is.na(DOW)) # removes NA first row
-
-WI_Hypsos <- NA
-for (i in seq_along(PercWI_DOWs)) {
-  dat <- read.csv(allWI_files[i])[,1:2] %>% setNames(c('depth_feet', 'proportion_area'))
-  dat$DOW <- PercWI_DOWs[i]
-  WI_Hypsos <- rbind(WI_Hypsos, dat)
-}
-WI_Hypsos <- WI_Hypsos %>% filter(!is.na(DOW)) # removes NA first row
-
-
-
-
-maxdepth <- data.frame("DOW" = character(1), "max_depth" = numeric(1), stringsAsFactors = FALSE)
-Hypsos <- rbind(WI_Hypsos, MN_Hypsos)
-unique(Hypsos$DOW)
-max_depth = Hypsos[1,1]; DOW = Hypsos[1,3]
-
-i = 1
-for (row in 1:nrow(Hypsos_depth)) {
-  if (DOW != Hypsos[row,3]) {
-    maxdepth[i, 1] = DOW
-    maxdepth[i, 2] = max_depth
-    i = i + 1
-    DOW = Hypsos[row,3]
-    max_depth = Hypsos[row, 1]
-  }
-  else {
-    max_depth = Hypsos[row, 1]
-  }
-}
-maxdepth[i,1] = DOW; maxdepth[i,2] = max_depth
-
-# statistics for all lake depths
-mean(maxdepth$max_depth)  #31.8
-confint(maxdepth$max_depth)
-se(maxdepth$max_depth)    #1.13
-min(maxdepth$max_depth)   #4
-max(maxdepth$max_depth)   #443
-median(maxdepth$max_depth) #25
-hist(maxdepth$max_depth, breaks = 50, xlim = c(0 , 450))
+area_diff %>% ggplot(aes(x = log(Area_acres), y = Mean_Absolute_Diff, col = Method), ylab("MAD"), xlab("Max depth (ft)")) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(y = "MAD", x = "Log Lake Area (Acres)")
+#ggtitle("MAD vs lake size separated by method")
+#ggsave(file = "MAD_vs_area.png", path = "Figures/", width = 4, height = 4, dpi = 250)
