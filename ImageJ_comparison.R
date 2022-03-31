@@ -236,6 +236,8 @@ sum(both_digitizers$Mean_Absolute_Diff > 0.15) # 7.5% (15) greater than 15% diff
 
 
 ### individual summaries
+
+### MAD
 mosaic::mean(Mean_Absolute_Diff~Method, data = Distances) 
 #Amanda = 0.046, Chris = 0.051, Null >= 0.15
 mean(Distances_AVP_CR$Mean_Absolute_Diff) #0.0157
@@ -250,19 +252,53 @@ Distances_CR <- Distances %>%
   dplyr::filter(Method == "ImageJ_CR")
 Distances_AVP <- Distances %>%
   dplyr::filter(Method == "ImageJ_AVP")
+Distance_linear <- Distances %>%
+  dplyr::filter(Method == "linear")
 
+# CI 
 t.test(Distances_CR$Mean_Absolute_Diff,   conf.level = 0.95)
 # Mean absolute distance is .051 (.040, .062)
 t.test(Distances_AVP$Mean_Absolute_Diff,   conf.level = 0.95)
 # Mean absolute distance is .046 (.035, .057)
+t.test(Distance_linear$Mean_Absolute_Diff,   conf.level = 0.95)
+# 0.1336908 0.1668049
 t.test(Distances_AVP_CR$Mean_Absolute_Diff, conf.level = 0.95)
 # Mean absolute distance is .016 (.011, .021)
+
+### MSD
+mosaic::mean(Mean_DEM_Diff~Method, data = Distances)
+#ellipsoid ImageJ_AVP  ImageJ_CR     linear 
+#0.36996858 0.03322862 0.03673179 0.10804825 
+mosaic::median(Mean_DEM_Diff~Method, data = Distances)
+# ellipsoid ImageJ_AVP  ImageJ_CR     linear 
+# 0.40215321 0.01752214 0.02521250 0.12737665 
+mosaic::sd(Mean_DEM_Diff~Method, data = Distances)
+# ellipsoid ImageJ_AVP  ImageJ_CR     linear 
+# 0.17295402 0.06202009 0.06320646 0.13120741 
+
+t.test(Distances_AVP$Mean_DEM_Diff,   conf.level = 0.95)
+# 0.02092249 - 0.04553475
+t.test(Distances_CR$Mean_DEM_Diff,   conf.level = 0.95)
+# 0.02419025 - 0.04927332
+t.test(Distance_linear$Mean_DEM_Diff,   conf.level = 0.95)
+# 0.08201385 - 0.13408265
 
 sum(Distances_CR$Mean_Absolute_Diff > 0.10)/100 # 14% (14) greater than 10% difference on average
 sum(Distances_CR$Mean_Absolute_Diff > 0.15)/100 # 9% (9) greater than 15% difference on average
 
 sum(Distances_AVP$Mean_Absolute_Diff > 0.10)/100 # 13% (13) greater than 10% difference on average
 sum(Distances_AVP$Mean_Absolute_Diff > 0.15)/100 # 6% (6) greater than 15% difference on average
+
+
+highmad_dows <- fixlakeid(c(03048400, 11011700, 13005400, 30014300, 33003600, 38053900, 47006400, 
+                  58014200, 61007800, 69004400, 69039700, 69074200, 71004600, 86024200))
+
+table1 <- Distances %>%
+  dplyr::filter(DOW %in% highmad_dows) %>%
+  dplyr::filter(Method == "ImageJ_CR" | Method == "ImageJ_AVP") %>%
+  group_by(DOW) %>%
+  mutate(mean_mad = mean(Mean_Absolute_Diff),
+         mean_msd = mean(Mean_DEM_Diff))
 
 
 ### ggplots ###
