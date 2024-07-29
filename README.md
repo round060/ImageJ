@@ -1,4 +1,7 @@
 # ImageJ
+
+Find the paper published in [L&O methods](https://doi.org/10.1002/lom3.10569) 
+
 Code and data for determining ImageJ accuracy to estimate hypsography from bathymetric maps.
 
   
